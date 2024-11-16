@@ -1,0 +1,100 @@
+/* form.css */
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+    background-color: #f7f7f7;
+    border-radius: 10px;
+    max-width: 600px;
+    margin: 0 auto;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  form div {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  label {
+    font-weight: bold;
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+  
+  input[type="text"],
+  input[type="number"],
+  textarea,
+  input[type="file"] {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+  }
+  
+  textarea {
+    resize: vertical;
+    height: 100px;
+  }
+  
+  button[type="submit"],
+  button[type="button"] {
+    padding: 10px 15px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    font-size: 14px;
+    margin-top: 10px;
+  }
+  
+  button[type="button"]:hover {
+    background-color: #218838;
+  }
+  
+  button[type="submit"]:hover {
+    background-color: #218838;
+  }
+  
+  h3 {
+    margin-top: 20px;
+    color: #333;
+  }
+  
+  /* p {
+    color: rgb(9, 9, 9);
+    font-size: 12px;
+  } */
+  
+  input[type="file"] {
+    border: none;
+  }
+  
+  .addon-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background-color: #e9ecef;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+  }
+  
+  button.remove-addon {
+    background-color: #dc3545;
+  }
+  
+  button.remove-addon:hover {
+    background-color: #c82333;
+  }
+  
+  button.add-addon {
+    background-color: #007bff;
+  }
+  
+  button.add-addon:hover {
+    background-color: #0069d9;
+  }
+  
