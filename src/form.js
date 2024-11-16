@@ -1,21 +1,58 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './form.css';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { supabase } from './supabase';
 
 const ProductForm = () => {
-  const categories = [
-    { name: 'Furniture', subcategories: ['Linear Workstation', 'L-Type Workstation', 'Md cabin','Manager Cabin','Small Cabin','Discussion Room','Interview Room','conference room','Board Room','Meeting Room','HR room','Video Recording Room','Reception','pantry','Phone Booth','Break Out room','UPS','Bms','Executive Washroom'] },
-    { name: 'Civil / Plumbing', subcategories: ['Basic','Luxury','Premium'] },
-    { name: 'Lighting', subcategories: ['Workstation', 'Cabin', 'meeting room', 'Public Spaces'] },
-    { name: 'Electrical', subcategories: ['Per sq ft cost standard'] },
-    { name: 'Partitions- door / windows / ceilings', subcategories: ['Workstation', 'Cabin', 'meeting room'] },
-    { name: 'Paint', subcategories: [] },
-    { name: 'HVAC', subcategories: ['Full Centralized'] },
-    { name: 'Smart Solutions', subcategories: [] },
-    { name: 'Flooring', subcategories: ['Workstation', 'Cabin', 'meeting room', 'Public Spaces'] },
-    { name: 'Accessories', subcategories: [] }
-  ];
+  // const categories = [
+  //   { name: 'Furniture', subcategories: ['Linear Workstation', 'L-Type Workstation', 'Md cabin','Manager Cabin','Small Cabin','Discussion Room','Interview Room','conference room','Board Room','Meeting Room','HR room','Video Recording Room','Reception','pantry','Phone Booth','Break Out room','UPS','Bms','Executive Washroom'] },
+  //   { name: 'Civil / Plumbing', subcategories: ['Basic','Luxury','Premium'] },
+  //   { name: 'Lighting', subcategories: ['Workstation', 'Cabin', 'meeting room', 'Public Spaces'] },
+  //   { name: 'Electrical', subcategories: ['Per sq ft cost standard'] },
+  //   { name: 'Partitions- door / windows / ceilings', subcategories: ['Workstation', 'Cabin', 'meeting room'] },
+  //   { name: 'Paint', subcategories: [] },
+  //   { name: 'HVAC', subcategories: ['Full Centralized'] },
+  //   { name: 'Smart Solutions', subcategories: [] },
+  //   { name: 'Flooring', subcategories: ['Workstation', 'Cabin', 'meeting room', 'Public Spaces'] },
+  //   { name: 'Accessories', subcategories: [] }
+  // ];
+
+  const [categories, setCategories] = useState([]);
+
+  const fetchCategories = async () => {
+    try {
+      // Fetch data from the 'categories' table
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*'); // Adjust the select fields if necessary
+
+      if (error) {
+        throw new Error(error.message);
+      }
+      console.log('Raw data:', data);
+
+      const formattedCategories = data.map(row => {
+        // Log each row to ensure subcategories exist and are structured correctly
+        console.log('Row data:', row);
+
+        return {
+          name: row.name,
+          // Ensure subcategories is an array, or set it to an empty array if it's null/undefined
+          subcategories: Array.isArray(JSON.parse(row.subcategories)) ? JSON.parse(row.subcategories) : [],
+        };
+      });
+
+      console.log('Formatted categories:', formattedCategories);
+
+      setCategories(formattedCategories); // Store categories in state
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []); // Empty dependency array ensures it runs once on mount
 
   const { register, handleSubmit, control, formState: { errors } } = useForm({
     defaultValues: {
@@ -88,7 +125,7 @@ const ProductForm = () => {
     <form className="" onSubmit={handleSubmit(onSubmit)}>
       <div>
         <label>Category:</label>
-        <select 
+        <select
           {...register('category', { required: 'Category is required' })}
           onChange={(e) => {
             const category = e.target.value;
