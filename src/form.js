@@ -4,19 +4,6 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { supabase } from './supabase';
 
 const ProductForm = () => {
-  // const categories = [
-  //   { name: 'Furniture', subcategories: ['Linear Workstation', 'L-Type Workstation', 'Md cabin','Manager Cabin','Small Cabin','Discussion Room','Interview Room','conference room','Board Room','Meeting Room','HR room','Video Recording Room','Reception','pantry','Phone Booth','Break Out room','UPS','Bms','Executive Washroom'] },
-  //   { name: 'Civil / Plumbing', subcategories: ['Basic','Luxury','Premium'] },
-  //   { name: 'Lighting', subcategories: ['Workstation', 'Cabin', 'meeting room', 'Public Spaces'] },
-  //   { name: 'Electrical', subcategories: ['Per sq ft cost standard'] },
-  //   { name: 'Partitions- door / windows / ceilings', subcategories: ['Workstation', 'Cabin', 'meeting room'] },
-  //   { name: 'Paint', subcategories: [] },
-  //   { name: 'HVAC', subcategories: ['Full Centralized'] },
-  //   { name: 'Smart Solutions', subcategories: [] },
-  //   { name: 'Flooring', subcategories: ['Workstation', 'Cabin', 'meeting room', 'Public Spaces'] },
-  //   { name: 'Accessories', subcategories: [] }
-  // ];
-
   const [categories, setCategories] = useState([]);
 
   const fetchCategories = async () => {
@@ -29,11 +16,9 @@ const ProductForm = () => {
       if (error) {
         throw new Error(error.message);
       }
-      console.log('Raw data:', data);
 
       const formattedCategories = data.map(row => {
         // Log each row to ensure subcategories exist and are structured correctly
-        console.log('Row data:', row);
 
         return {
           name: row.name,
@@ -41,8 +26,6 @@ const ProductForm = () => {
           subcategories: Array.isArray(JSON.parse(row.subcategories)) ? JSON.parse(row.subcategories) : [],
         };
       });
-
-      console.log('Formatted categories:', formattedCategories);
 
       setCategories(formattedCategories); // Store categories in state
     } catch (err) {
@@ -72,54 +55,128 @@ const ProductForm = () => {
   });
 
   const [subcategories, setSubcategories] = useState([]);
+  const [selectedSubcategory, setSelectedSubcategory] = useState('');
+  const [subSubCategory, setSubSubCategory] = useState('');
+
+  const [variants, setVariants] = useState([{ title: '', price: '', details: '', image: null }]);
+
+  const handleAddVariant = () => {
+    setVariants([...variants, { title: '', price: '', details: '', image: null }]);
+  };
+
+  const handleRemoveVariant = (index) => {
+    const updatedVariants = variants.filter((_, i) => i !== index);
+    setVariants(updatedVariants);
+  };
 
   const onSubmit = async (data) => {
-    console.log(data);
-    const { data: ProductImage, error: ProductImageError } = await supabase.storage.from("addon").upload(`${data.title}-${data.details}`, data.image[0]);
-    if (ProductImageError) {
-      console.log(ProductImageError);
+    // Check if the product already exists based on category, subcategory, and subSubCategory (from state)
+    const { data: existingProduct, error: existingProductError } = await supabase
+      .from("products")
+      .select("id")
+      .eq("category", data.category)
+      .eq("subcategory", data.subcategory)
+      .eq("subcategory1", subSubCategory)  // subSubCategory is from the state
+      .single();
+  
+    if (existingProductError && existingProductError.code !== 'PGRST116') {
+      console.error(existingProductError);
       return;
     }
-
-    const { data: Product, error } = await supabase.from("products").insert({
-      title: data.title,
-      details: data.details,
-      price: data.price,
-      image: ProductImage.path,
-      category: data.category,
-      subcategory: data.subcategory || null, // Save the subcategory if present
-    }).select().single();
-
-    if (error) {
-      console.log(error);
-      return;
-    }
-
-    for (let addons in data.addons) {
-      const adf = data.addons[addons];
-      console.log(adf);
-      const { data: AddonFile, error: AddonFileError } = await supabase.storage.from("addon").upload(`${Product.id}-${adf.title}`, adf.image[0]);
-      if (AddonFileError) {
-        console.error(AddonFileError);
-        await supabase.from("products").delete().eq("id", Product.id);
-        break;
+  
+    let productId;
+    if (existingProduct) {
+      // If the product already exists, use the existing product ID
+      productId = existingProduct.id;
+    } else {
+      // Insert a new product if it doesn't exist
+      const { data: Product, error: insertError } = await supabase.from("products").insert({
+        category: data.category,
+        subcategory: data.subcategory || null,
+        subcategory1: subSubCategory || null,  // Insert subSubCategory (from state)
+      }).select().single();
+  
+      if (insertError) {
+        console.error(insertError);
+        return;
       }
-      const { error: AddonError } = await supabase.from("addons").insert({
-        title: adf.title,
-        price: adf.price,
-        image: AddonFile.path,
-        productid: Product.id
-      });
-      if (AddonError) {
-        console.error(AddonError);
-        await supabase.from("products").delete().eq("id", Product.id);
-        break;
+  
+      // Use the newly inserted product ID
+      productId = Product.id;
+    }
+  
+    // Now proceed with adding variants (using the productId)
+    for (const variant of variants) {
+      if (variant.title && variant.price && variant.image) {
+        // Upload the variant image to Supabase storage
+        const { data: VariantImage, error: VariantImageError } = await supabase.storage.from("addon").upload(`${variant.title}-${productId}`, variant.image[0]);
+        
+        if (VariantImageError) {
+          console.error(VariantImageError);
+          await supabase.from("products").delete().eq("id", productId); // Optionally delete if variant image upload fails
+          break;
+        }
+  
+        // Insert the variant into the product_variants table
+        const { error: VariantError } = await supabase.from("product_variants").insert({
+          product_id: productId,  // Link variant to the product
+          title: variant.title,
+          price: variant.price,
+          details: variant.details,
+          image: VariantImage.path,  // Image path from Supabase storage
+        });
+  
+        if (VariantError) {
+          console.error(VariantError);
+          await supabase.from("products").delete().eq("id", productId); // Rollback if variant insertion fails
+          break;
+        }
       }
     }
-
-    // Refresh the page after submission
-    window.location.reload();
-  };
+  
+    // Now handle the addons (if any)
+    for (const addon of data.addons) {
+      const { image, title, price } = addon;
+    
+      // Log the addon data
+      console.log("Addon Data:", addon);
+    
+      // Check if image, title, and price are provided
+      if (image && title && price) {
+        // Step 1: Upload the image to Supabase Storage
+        const { data: addonImageData, error: addonImageError } = await supabase.storage
+          .from('addon') // Ensure correct bucket name is used
+          .upload(`${title}-${productId}`, image[0]); // Upload using the title and ensure image is a file input
+    
+        // Handle image upload error
+        if (addonImageError) {
+          console.error("Error uploading addon image:", addonImageError);
+          continue; // Skip this iteration if upload fails
+        }
+    
+        // Log the uploaded image path
+        console.log("Uploaded image path:", addonImageData?.path);
+    
+        // Step 2: Insert the addon data into the database
+        const { error: addonError } = await supabase.from('addons').insert({
+          productid: productId,
+          image: addonImageData?.path,  // Use the correct image path
+          title: title,  // Use title from the current addon
+          price: price,  // Use price from the current addon
+        });
+    
+        // Handle error while inserting addon data
+        if (addonError) {
+          console.error("Error inserting addon:", addonError);
+        } else {
+          console.log("Addon inserted successfully");
+        }
+      }
+    }    
+  
+    // Optionally reload the page after the successful submit
+    // window.location.reload();
+  };  
 
   return (
     <form className="" onSubmit={handleSubmit(onSubmit)}>
@@ -143,11 +200,17 @@ const ProductForm = () => {
         {errors.category && <p>{errors.category.message}</p>}
       </div>
 
-      {/* Conditionally render subcategories for selected categories */}
       {subcategories.length > 0 && (
         <div>
           <label>Subcategory:</label>
-          <select {...register('subcategory', { required: 'Subcategory is required' })}>
+          <select
+            {...register('subcategory', { required: 'Subcategory is required' })}
+            onChange={(e) => {
+              setSelectedSubcategory(e.target.value);
+              // Clear the sub subcategory input when the subcategory changes
+              setSubSubCategory(''); // Make sure you have this state to store the sub sub category
+            }}
+          >
             <option value="">Select Subcategory</option>
             {subcategories.map((subcategory, index) => (
               <option key={index} value={subcategory}>
@@ -160,37 +223,77 @@ const ProductForm = () => {
       )}
 
       <div>
-        <label>Title:</label>
+        <label>Sub Sub Category:</label>
         <input
           type="text"
-          {...register('title', { required: 'Title is required' })}
+          value={subSubCategory} // You need a state variable to store this value
+          onChange={(e) => setSubSubCategory(e.target.value)}
         />
-        {errors.title && <p>{errors.title.message}</p>}
       </div>
 
       <div>
-        <label>Details:</label>
-        <textarea
-          {...register('details', { required: 'Details are required' })}
-        />
-        {errors.details && <p>{errors.details.message}</p>}
-      </div>
+        <h3>Product Variants</h3>
+        {variants.map((variant, index) => (
+          <div key={index}>
+            <div>
+              <label>Variant Title:</label>
+              <input
+                type="text"
+                value={variant.title}
+                onChange={(e) => {
+                  const updatedVariants = [...variants];
+                  updatedVariants[index].title = e.target.value;
+                  setVariants(updatedVariants);
+                }}
+              />
+            </div>
 
-      <div>
-        <label>Price:</label>
-        <input
-          type="number"
-          {...register('price', { required: 'Price is required' })}
-        />
-        {errors.price && <p>{errors.price.message}</p>}
-      </div>
+            <div>
+              <label>Variant Price:</label>
+              <input
+                type="number"
+                value={variant.price}
+                onChange={(e) => {
+                  const updatedVariants = [...variants];
+                  updatedVariants[index].price = e.target.value;
+                  setVariants(updatedVariants);
+                }}
+              />
+            </div>
 
-      <div>
-        <label>Image:</label>
-        <input
-          type="file"
-          {...register(`image`, { required: 'Image is required' })}
-        />
+            <div>
+              <label>Variant Details:</label>
+              <textarea
+                value={variant.details}
+                onChange={(e) => {
+                  const updatedVariants = [...variants];
+                  updatedVariants[index].details = e.target.value;
+                  setVariants(updatedVariants);
+                }}
+              />
+            </div>
+
+            <div>
+              <label>Variant Image:</label>
+              <input
+                type="file"
+                onChange={(e) => {
+                  const updatedVariants = [...variants];
+                  updatedVariants[index].image = e.target.files;
+                  setVariants(updatedVariants);
+                }}
+              />
+            </div>
+
+            <button type="button" onClick={() => handleRemoveVariant(index)}>
+              Remove Variant
+            </button>
+          </div>
+        ))}
+
+        <button type="button" onClick={handleAddVariant}>
+          Add Variant
+        </button>
       </div>
 
       <div>
