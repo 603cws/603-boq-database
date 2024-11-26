@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './form.css';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { supabase } from './supabase';
+import { toast, Toaster } from 'react-hot-toast';
 
 const ProductForm = () => {
   const [categories, setCategories] = useState([]);
@@ -18,7 +19,6 @@ const ProductForm = () => {
       }
 
       const formattedCategories = data.map(row => {
-        // Log each row to ensure subcategories exist and are structured correctly
 
         return {
           name: row.name,
@@ -78,16 +78,18 @@ const ProductForm = () => {
       .eq("subcategory", data.subcategory)
       .eq("subcategory1", subSubCategory)  // subSubCategory is from the state
       .single();
-  
+
     if (existingProductError && existingProductError.code !== 'PGRST116') {
       console.error(existingProductError);
+      toast.error("Error checking existing product.");
       return;
     }
-  
+
     let productId;
     if (existingProduct) {
       // If the product already exists, use the existing product ID
       productId = existingProduct.id;
+      toast.success("Product already exists. Proceeding with variants and addons.");
     } else {
       // Insert a new product if it doesn't exist
       const { data: Product, error: insertError } = await supabase.from("products").insert({
@@ -95,28 +97,31 @@ const ProductForm = () => {
         subcategory: data.subcategory || null,
         subcategory1: subSubCategory || null,  // Insert subSubCategory (from state)
       }).select().single();
-  
+
       if (insertError) {
         console.error(insertError);
+        toast.error("Error inserting new product.");
         return;
       }
-  
+
       // Use the newly inserted product ID
       productId = Product.id;
+      toast.success("New product inserted successfully.");
     }
-  
+
     // Now proceed with adding variants (using the productId)
     for (const variant of variants) {
       if (variant.title && variant.price && variant.image) {
         // Upload the variant image to Supabase storage
         const { data: VariantImage, error: VariantImageError } = await supabase.storage.from("addon").upload(`${variant.title}-${productId}`, variant.image[0]);
-        
+
         if (VariantImageError) {
           console.error(VariantImageError);
-          await supabase.from("products").delete().eq("id", productId); // Optionally delete if variant image upload fails
+          toast.error(`Error uploading image for variant: ${variant.title}`);
+          await supabase.from("products").delete().eq("id", `${variant.title}-${productId}`); // Optionally delete if variant image upload fails
           break;
         }
-  
+
         // Insert the variant into the product_variants table
         const { error: VariantError } = await supabase.from("product_variants").insert({
           product_id: productId,  // Link variant to the product
@@ -125,38 +130,41 @@ const ProductForm = () => {
           details: variant.details,
           image: VariantImage.path,  // Image path from Supabase storage
         });
-  
+
         if (VariantError) {
           console.error(VariantError);
+          toast.error(`Error inserting variant: ${variant.title}`);
           await supabase.from("products").delete().eq("id", productId); // Rollback if variant insertion fails
           break;
         }
+        toast.success(`Variant ${variant.title} added successfully.`);
       }
     }
-  
+
     // Now handle the addons (if any)
     for (const addon of data.addons) {
       const { image, title, price } = addon;
-    
+
       // Log the addon data
       console.log("Addon Data:", addon);
-    
+
       // Check if image, title, and price are provided
       if (image && title && price) {
         // Step 1: Upload the image to Supabase Storage
         const { data: addonImageData, error: addonImageError } = await supabase.storage
           .from('addon') // Ensure correct bucket name is used
           .upload(`${title}-${productId}`, image[0]); // Upload using the title and ensure image is a file input
-    
+
         // Handle image upload error
         if (addonImageError) {
           console.error("Error uploading addon image:", addonImageError);
+          toast.error(`Error uploading image for addon: ${title}`);
           continue; // Skip this iteration if upload fails
         }
-    
+
         // Log the uploaded image path
         console.log("Uploaded image path:", addonImageData?.path);
-    
+
         // Step 2: Insert the addon data into the database
         const { error: addonError } = await supabase.from('addons').insert({
           productid: productId,
@@ -164,22 +172,36 @@ const ProductForm = () => {
           title: title,  // Use title from the current addon
           price: price,  // Use price from the current addon
         });
-    
+
         // Handle error while inserting addon data
         if (addonError) {
           console.error("Error inserting addon:", addonError);
+          toast.error(`Error inserting addon: ${title}`);
         } else {
           console.log("Addon inserted successfully");
+          toast.success(`Addon ${title} added successfully.`);
         }
       }
-    }    
-  
-    // Optionally reload the page after the successful submit
-    // window.location.reload();
-  };  
+    }
+
+    // Show success toast for data insertion
+    toast.success("Data inserted successfully!");
+
+    // Show info toast for page refresh after a delay
+    setTimeout(() => {
+      toast.success("Page will refresh soon...");
+    }, 2000);
+
+    // Reload the page after some time
+    setTimeout(() => {
+      window.location.reload();
+    }, 5000);
+  };
 
   return (
     <form className="" onSubmit={handleSubmit(onSubmit)}>
+      <Toaster position="top-center" reverseOrder={false}
+        toastOptions={{ style: { margin: "0 auto", textAlign: "center", } }} />
       <div>
         <label>Category:</label>
         <select
@@ -222,14 +244,16 @@ const ProductForm = () => {
         </div>
       )}
 
-      <div>
-        <label>Sub Sub Category:</label>
-        <input
-          type="text"
-          value={subSubCategory} // You need a state variable to store this value
-          onChange={(e) => setSubSubCategory(e.target.value)}
-        />
-      </div>
+      {selectedSubcategory && (
+        <div>
+          <label>Sub Sub Category:</label>
+          <input
+            type="text"
+            value={subSubCategory} // You need a state variable to store this value
+            onChange={(e) => setSubSubCategory(e.target.value)}
+          />
+        </div>
+      )}
 
       <div>
         <h3>Product Variants</h3>
