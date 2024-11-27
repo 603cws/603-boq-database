@@ -7,6 +7,7 @@ import DataTable from './DataTable';
 import EditProduct from './EditProduct';
 import Categories from './Categories'; // Import the Categories component
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Addon from './Addon';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -26,6 +27,8 @@ root.render(
 
       {/* Route to manage categories */}
       <Route path="/categories" element={<Categories />} />
+      <Route path="/Addon" element={<Addon />} />
+
     </Routes>
   </BrowserRouter>
 );

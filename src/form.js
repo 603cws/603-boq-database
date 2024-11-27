@@ -57,7 +57,7 @@ const ProductForm = () => {
   const [subcategories, setSubcategories] = useState([]);
   const [selectedSubcategory, setSelectedSubcategory] = useState('');
   const [subSubCategory, setSubSubCategory] = useState('');
-
+  const [addonCat, setAddonCat] = useState('');
   const [variants, setVariants] = useState([{ title: '', price: '', details: '', image: null }]);
 
   const handleAddVariant = () => {
@@ -142,44 +142,51 @@ const ProductForm = () => {
     }
 
     // Now handle the addons (if any)
+    const { data: addonCategory, error: addonCategoryError } = await supabase
+      .from('addons')
+      .insert({ title: addonCat, productid: productId }) // Insert the Addon Category title
+      .select()
+      .single();
+
+    if (addonCategoryError) {
+      console.error("Error inserting addon category:", addonCategoryError);
+      toast.error("Failed to save addon category.");
+      return;
+    }
+
+    const addonId = addonCategory.id; // Store the retrieved addonId
+    toast.success("Addon category saved successfully.");
+
+    // Step 2: Insert Addon Variants
     for (const addon of data.addons) {
       const { image, title, price } = addon;
 
-      // Log the addon data
-      console.log("Addon Data:", addon);
-
-      // Check if image, title, and price are provided
       if (image && title && price) {
-        // Step 1: Upload the image to Supabase Storage
-        const { data: addonImageData, error: addonImageError } = await supabase.storage
-          .from('addon') // Ensure correct bucket name is used
-          .upload(`${title}-${productId}`, image[0]); // Upload using the title and ensure image is a file input
+        // Upload the variant image to Supabase storage
+        const { data: addonVariantImage, error: addonVariantImageError } = await supabase.storage
+          .from('addon') // Ensure correct bucket
+          .upload(`${title}-${addonId}`, image[0]);
 
-        // Handle image upload error
-        if (addonImageError) {
-          console.error("Error uploading addon image:", addonImageError);
-          toast.error(`Error uploading image for addon: ${title}`);
-          continue; // Skip this iteration if upload fails
+        if (addonVariantImageError) {
+          console.error("Error uploading addon variant image:", addonVariantImageError);
+          toast.error(`Failed to upload image for addon variant: ${title}`);
+          continue; // Skip to the next variant if upload fails
         }
 
-        // Log the uploaded image path
-        console.log("Uploaded image path:", addonImageData?.path);
-
-        // Step 2: Insert the addon data into the database
-        const { error: addonError } = await supabase.from('addons').insert({
-          productid: productId,
-          image: addonImageData?.path,  // Use the correct image path
-          title: title,  // Use title from the current addon
-          price: price,  // Use price from the current addon
+        // Insert the variant into the addon_variants table
+        const { error: addonVariantError } = await supabase.from('addon_variants').insert({
+          addonid: addonId, // Link the variant to the Addon Category 
+          title,
+          price,
+          image: addonVariantImage.path, // Store the uploaded image path
         });
 
-        // Handle error while inserting addon data
-        if (addonError) {
-          console.error("Error inserting addon:", addonError);
-          toast.error(`Error inserting addon: ${title}`);
+        if (addonVariantError) {
+          console.error("Error inserting addon variant:", addonVariantError);
+          toast.error(`Failed to save addon variant: ${title}`);
+          return;
         } else {
-          console.log("Addon inserted successfully");
-          toast.success(`Addon ${title} added successfully.`);
+          toast.success(`Addon variant ${title} added successfully.`);
         }
       }
     }
@@ -188,27 +195,34 @@ const ProductForm = () => {
     toast.success("Data inserted successfully!");
 
     // Show info toast for page refresh after a delay
-    setTimeout(() => {
-      toast.success("Page will refresh soon...");
-    }, 2000);
+    // setTimeout(() => {
+    //   toast.success("Page will refresh soon...");
+    // }, 2000);
 
-    // Reload the page after some time
-    setTimeout(() => {
-      window.location.reload();
-    }, 5000);
+    // // Reload the page after some time
+    // setTimeout(() => {
+    //   window.location.reload();
+    // }, 5000);
   };
 
   return (
     <form className="" onSubmit={handleSubmit(onSubmit)}>
-      <Toaster position="top-center" reverseOrder={false}
-        toastOptions={{ style: { margin: "0 auto", textAlign: "center", } }} />
+      <Toaster
+        position="top-center"
+        reverseOrder={false}
+        toastOptions={{
+          style: { margin: "0 auto", textAlign: "center" },
+        }}
+      />
+
+      {/* Category Section */}
       <div>
         <label>Category:</label>
         <select
           {...register('category', { required: 'Category is required' })}
           onChange={(e) => {
             const category = e.target.value;
-            const selectedCatObj = categories.find(cat => cat.name === category);
+            const selectedCatObj = categories.find((cat) => cat.name === category);
             setSubcategories(selectedCatObj?.subcategories || []);
           }}
         >
@@ -222,6 +236,7 @@ const ProductForm = () => {
         {errors.category && <p>{errors.category.message}</p>}
       </div>
 
+      {/* Subcategory Section */}
       {subcategories.length > 0 && (
         <div>
           <label>Subcategory:</label>
@@ -229,8 +244,7 @@ const ProductForm = () => {
             {...register('subcategory', { required: 'Subcategory is required' })}
             onChange={(e) => {
               setSelectedSubcategory(e.target.value);
-              // Clear the sub subcategory input when the subcategory changes
-              setSubSubCategory(''); // Make sure you have this state to store the sub sub category
+              setSubSubCategory('');
             }}
           >
             <option value="">Select Subcategory</option>
@@ -244,17 +258,19 @@ const ProductForm = () => {
         </div>
       )}
 
+      {/* Sub Subcategory Section */}
       {selectedSubcategory && (
         <div>
           <label>Sub Sub Category:</label>
           <input
             type="text"
-            value={subSubCategory} // You need a state variable to store this value
+            value={subSubCategory}
             onChange={(e) => setSubSubCategory(e.target.value)}
           />
         </div>
       )}
 
+      {/* Product Variants Section */}
       <div>
         <h3>Product Variants</h3>
         {variants.map((variant, index) => (
@@ -309,43 +325,77 @@ const ProductForm = () => {
               />
             </div>
 
-            <button type="button" onClick={() => handleRemoveVariant(index)}>
+            <button
+              type="button"
+              className="mt-2 px-4 py-2 bg-red-500 text-white font-semibold rounded-lg shadow-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-400"
+              onClick={() => handleRemoveVariant(index)}
+            >
               Remove Variant
             </button>
           </div>
         ))}
 
-        <button type="button" onClick={handleAddVariant}>
+        <button
+          type="button"
+          className="mt-4 px-4 py-2 bg-teal-500 text-white font-semibold rounded-lg shadow-md hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-400"
+          onClick={handleAddVariant}
+        >
           Add Variant
         </button>
       </div>
 
+      {/* Addon Section */}
       <div>
-        <h3>Add-ons</h3>
+        <label>Addon Category:</label>
+        <input
+          type="text"
+          value={addonCat}
+          onChange={(e) => setAddonCat(e.target.value)}
+        />
+      </div>
+
+      <div>
+        <h3>Addon Variants</h3>
         {fields.map((addon, index) => (
           <div key={addon.id}>
             <label>Image:</label>
             <input
               type="file"
-              {...register(`addons.${index}.image`, { required: 'Image is required' })}
+              {...register(`addons.${index}.image`, {
+                required: 'Image is required',
+              })}
             />
-            {errors.addons?.[index]?.image && <p>{errors.addons[index].image.message}</p>}
+            {errors.addons?.[index]?.image && (
+              <p>{errors.addons[index].image.message}</p>
+            )}
 
             <label>Title:</label>
             <input
               type="text"
-              {...register(`addons.${index}.title`, { required: 'Addon title is required' })}
+              {...register(`addons.${index}.title`, {
+                required: 'Addon title is required',
+              })}
             />
-            {errors.addons?.[index]?.title && <p>{errors.addons[index].title.message}</p>}
+            {errors.addons?.[index]?.title && (
+              <p>{errors.addons[index].title.message}</p>
+            )}
 
             <label>Price:</label>
             <input
               type="number"
-              {...register(`addons.${index}.price`, { required: 'Addon price is required' })}
+              {...register(`addons.${index}.price`, {
+                required: 'Addon price is required',
+              })}
             />
-            {errors.addons?.[index]?.price && <p>{errors.addons[index].price.message}</p>}
+            {errors.addons?.[index]?.price && (
+              <p>{errors.addons[index].price.message}</p>
+            )}
 
-            <button type="button" onClick={() => remove(index)}>
+            <button
+              type="button"
+              className="mt-2 px-4 py-2 bg-amber-500 text-white font-semibold rounded-lg shadow-md hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-400"
+              onClick={() => remove(index)}
+            >
               Remove Addon
             </button>
           </div>
@@ -353,13 +403,20 @@ const ProductForm = () => {
 
         <button
           type="button"
+          className="mt-4 px-4 py-2 bg-slate-500 text-white font-semibold rounded-lg shadow-md hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-400"
           onClick={() => append({ image: null, title: '', price: '' })}
         >
           Add Addon
         </button>
       </div>
 
-      <button type="submit">Submit</button>
+      {/* Submit Button */}
+      <button
+        type="submit"
+        className="mt-6 px-6 py-3 bg-emerald-500 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+        >
+        Submit
+      </button>
     </form>
   );
 };

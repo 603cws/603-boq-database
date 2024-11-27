@@ -173,15 +173,24 @@ const Categories = () => {
                 />
                 <button
                     onClick={handleAdd}
-                    className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-4 py-2 bg-[#387478] text-white font-semibold rounded-lg shadow-md hover:bg-[#629584] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                // bg-blue-600
                 >
                     Add Category
                 </button>
                 <button
                     onClick={() => navigate('/datatable')}
-                    className="mb-6 ml-4 px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="mb-6 ml-4 px-4 py-2 bg-[#8adfa3] text-white font-semibold rounded-lg shadow-md hover:bg-[#9abf80] focus:outline-none focus:ring-2 focus:ring-green-500"
+                // bg-orange-400
                 >
                     Manage Products
+                </button>
+                <button
+                    onClick={() => navigate('/Addon')}
+                    className="mb-6 ml-4 px-4 py-2 bg-[#ffbf61] text-white font-semibold rounded-lg shadow-md hover:bg-[#ffad60] focus:outline-none focus:ring-2 focus:ring-purple-500"
+                // bg-green-600
+                >
+                    Manage Add-ons
                 </button>
             </div>
 
@@ -248,7 +257,7 @@ const Categories = () => {
                                                 setEditCategory(category);
                                                 window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to top smoothly
                                             }}
-                                            className="px-4 py-2 bg-yellow-600 text-white rounded-lg shadow-md hover:bg-yellow-700 focus:outline-none"
+                                            className="w-full px-4 py-2 bg-yellow-400 text-white rounded-lg shadow hover:bg-yellow-500 focus:outline-none"
                                         >
                                             Edit
                                         </button>
