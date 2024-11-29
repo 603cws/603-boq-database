@@ -127,7 +127,7 @@ const EditAddonVariant = () => {
                     className="space-y-6"
                     onSubmit={(e) => {
                         e.preventDefault();
-                        // handleSave();
+                        handleSave();
                     }}
                 >
                     <div>
