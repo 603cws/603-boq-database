@@ -1,17 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom'; // Import useNavigate
-import { supabase } from './supabase'; // Ensure your Supabase client is configured
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from './supabase';
 
 const EditProduct = () => {
-  const { id: productId } = useParams(); // Extract the id parameter from the URL
-  const navigate = useNavigate(); // Initialize useNavigate
+  const { id: productId } = useParams();
+  const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(false);
   const [formValues, setFormValues] = useState({
     title: '',
     price: '',
     details: '',
+    image: '',
   });
+  const [imageFile, setImageFile] = useState(null); // State to store the new image file
 
   // Fetch product details for editing
   useEffect(() => {
@@ -33,6 +35,7 @@ const EditProduct = () => {
             title: data.title,
             price: data.price,
             details: data.details,
+            image: data.image,
           });
         }
       };
@@ -47,20 +50,57 @@ const EditProduct = () => {
     setFormValues((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Handle image file selection
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImageFile(file);
+    }
+  };
+
   // Handle form submission for updating the product
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    let updatedValues = { ...formValues };
+
+    // If a new image is selected, upload it to Supabase storage
+    if (imageFile) {
+      const fileName = `${imageFile.name.split('.')[0]}-${productId}`; // Generate file name
+      const { error: uploadError } = await supabase.storage
+        .from('addon')
+        .upload(fileName, imageFile, {
+          upsert: true, // Overwrite if it already exists
+        });
+
+      if (uploadError) {
+        console.error('Error uploading image:', uploadError.message);
+        return;
+      }
+
+      // Update the image field with the new file name
+      updatedValues.image = fileName;
+    }
+
+    // Update the product details in the database
     const { error } = await supabase
       .from('product_variants')
-      .update(formValues)
+      .update(updatedValues)
       .eq('id', productId);
 
     if (error) {
       console.error('Error updating product:', error.message);
     } else {
       alert('Product updated successfully!');
-      navigate('/');
+      navigate('/datatable');
+    }
+  };
+
+  // Handle cancel and confirm if user wants to discard changes
+  const handleCancel = () => {
+    const discardChanges = window.confirm('Are you sure you want to discard your changes?');
+    if (discardChanges) {
+      navigate('/datatable');
     }
   };
 
@@ -102,12 +142,37 @@ const EditProduct = () => {
             rows="4"
           />
         </div>
-        <button
-          type="submit"
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Save Changes
-        </button>
+        <div>
+          <label className="block text-gray-700 font-medium">Image</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+            className="w-full px-4 py-2 border rounded-lg"
+          />
+          {formValues.image && (
+            <img
+              src={`https://bwxzfwsoxwtzhjbzbdzs.supabase.co/storage/v1/object/public/addon/${formValues.image}`}
+              alt="Current product"
+              className="mt-4 w-32 h-32 object-cover rounded"
+            />
+          )}
+        </div>
+        <div className="flex space-x-4">
+          <button
+            type="submit"
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Save Changes
+          </button>
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+          >
+            Cancel
+          </button>
+        </div>
       </form>
     </div>
   );

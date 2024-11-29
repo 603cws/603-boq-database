@@ -8,6 +8,8 @@ import EditProduct from './EditProduct';
 import Categories from './Categories'; // Import the Categories component
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Addon from './Addon';
+import AddonVariant from './AddonVariant';
+import EditAddonVariant from './EditAddonVariant';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -24,10 +26,14 @@ root.render(
 
       <Route path="/datatable" element={<DataTable />} />
 
-
       {/* Route to manage categories */}
       <Route path="/categories" element={<Categories />} />
+
       <Route path="/Addon" element={<Addon />} />
+
+      <Route path="/AddonVariant" element={<AddonVariant />} />
+
+      <Route path="/edit-addon-variant/:id" element={<EditAddonVariant />} />
 
     </Routes>
   </BrowserRouter>
