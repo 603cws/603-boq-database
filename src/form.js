@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './form.css';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { supabase } from './supabase';
@@ -6,6 +6,9 @@ import { toast, Toaster } from 'react-hot-toast';
 
 const ProductForm = () => {
   const [categories, setCategories] = useState([]);
+
+  const variantRef = useRef(null);
+  const addonRef = useRef(null);
 
   const fetchCategories = async () => {
     try {
@@ -62,6 +65,20 @@ const ProductForm = () => {
 
   const handleAddVariant = () => {
     setVariants([...variants, { title: '', price: '', details: '', image: null }]);
+    // Scroll to the newly added variant
+    setTimeout(() => {
+      variantRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
+
+  const handleAddAddon = () => {
+    // Add a new addon logic
+    append({ image: null, title: '', price: '' });
+
+    // Scroll to the newly added addon
+    setTimeout(() => {
+      addonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const handleRemoveVariant = (index) => {
@@ -274,7 +291,11 @@ const ProductForm = () => {
       <div>
         <h3>Product Variants</h3>
         {variants.map((variant, index) => (
-          <div key={index}>
+          <div
+            key={index}
+            ref={index === variants.length - 1 ? variantRef : null} // Attach ref to the last variant
+            className="p-4 border border-gray-300 rounded-lg my-2 shadow-sm"
+          >
             <div>
               <label>Variant Title:</label>
               <input
@@ -317,6 +338,7 @@ const ProductForm = () => {
               <label>Variant Image:</label>
               <input
                 type="file"
+                accept="image/*" // Accepts all image types like jpg, png, gif, etc.
                 onChange={(e) => {
                   const updatedVariants = [...variants];
                   updatedVariants[index].image = e.target.files;
@@ -357,10 +379,15 @@ const ProductForm = () => {
       <div>
         <h3>Addon Variants</h3>
         {fields.map((addon, index) => (
-          <div key={addon.id}>
+          <div
+            key={addon.id}
+            ref={index === fields.length - 1 ? addonRef : null} // Attach ref to the last addon
+            className="p-4 border border-gray-300 rounded-lg my-2 shadow-sm"
+          >
             <label>Image:</label>
             <input
               type="file"
+              accept="image/*" // Accepts all image types like jpg, png, gif, etc.
               {...register(`addons.${index}.image`, {
                 required: 'Image is required',
               })}
@@ -404,7 +431,7 @@ const ProductForm = () => {
         <button
           type="button"
           className="mt-4 px-4 py-2 bg-slate-500 text-white font-semibold rounded-lg shadow-md hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-400"
-          onClick={() => append({ image: null, title: '', price: '' })}
+          onClick={handleAddAddon}
         >
           Add Addon
         </button>
@@ -414,7 +441,7 @@ const ProductForm = () => {
       <button
         type="submit"
         className="mt-6 px-6 py-3 bg-emerald-500 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-        >
+      >
         Submit
       </button>
     </form>
