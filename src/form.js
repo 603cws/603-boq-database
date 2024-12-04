@@ -212,14 +212,14 @@ const ProductForm = () => {
     toast.success("Data inserted successfully!");
 
     // Show info toast for page refresh after a delay
-    // setTimeout(() => {
-    //   toast.success("Page will refresh soon...");
-    // }, 2000);
+    setTimeout(() => {
+      toast.success("Page will refresh soon...");
+    }, 2000);
 
-    // // Reload the page after some time
-    // setTimeout(() => {
-    //   window.location.reload();
-    // }, 5000);
+    // Reload the page after some time
+    setTimeout(() => {
+      window.location.reload();
+    }, 5000);
   };
 
   return (
