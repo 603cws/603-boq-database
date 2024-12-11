@@ -12,8 +12,12 @@ const EditProduct = () => {
     price: '',
     details: '',
     image: '',
+    additional_images: '[]', // JSON string for additional images
   });
-  const [imageFile, setImageFile] = useState(null); // State to store the new image file
+  const [imageFile, setImageFile] = useState(null); // Main image file
+  const [additionalImageFiles, setAdditionalImageFiles] = useState([]); // New additional images
+
+  const baseImageUrl = 'https://bwxzfwsoxwtzhjbzbdzs.supabase.co/storage/v1/object/public/addon/';
 
   // Fetch product details for editing
   useEffect(() => {
@@ -36,6 +40,7 @@ const EditProduct = () => {
             price: data.price,
             details: data.details,
             image: data.image,
+            additional_images: data.additional_images || '[]', // Ensure we get a JSON string
           });
         }
       };
@@ -58,19 +63,45 @@ const EditProduct = () => {
     }
   };
 
-  // Handle form submission for updating the product
+  // Handle additional image file selection
+  const handleAdditionalImagesChange = (e) => {
+    const files = Array.from(e.target.files);
+    setAdditionalImageFiles((prev) => [...prev, ...files]);
+  };
+
+  // Delete a specific additional image
+  const deleteAdditionalImage = async (imageName) => {
+    const images = JSON.parse(formValues.additional_images || '[]').filter((img) => img !== imageName);
+
+    // Update the database
+    const { error } = await supabase
+      .from('product_variants')
+      .update({ additional_images: JSON.stringify(images) })
+      .eq('id', productId);
+
+    if (error) {
+      console.error('Error deleting additional image:', error.message);
+    } else {
+      setFormValues((prev) => ({
+        ...prev,
+        additional_images: JSON.stringify(images),
+      }));
+    }
+  };
+
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     let updatedValues = { ...formValues };
 
-    // If a new image is selected, upload it to Supabase storage
+    // Upload main image if updated
     if (imageFile) {
-      const fileName = `${imageFile.name.split('.')[0]}-${productId}`; // Generate file name
+      const fileName = `${imageFile.name.split('.')[0]}-${productId}`;
       const { error: uploadError } = await supabase.storage
         .from('addon')
         .upload(fileName, imageFile, {
-          upsert: true, // Overwrite if it already exists
+          upsert: true,
         });
 
       if (uploadError) {
@@ -78,8 +109,28 @@ const EditProduct = () => {
         return;
       }
 
-      // Update the image field with the new file name
       updatedValues.image = fileName;
+    }
+
+    // Upload additional images
+    if (additionalImageFiles.length > 0) {
+      const uploadedImages = [];
+      for (const file of additionalImageFiles) {
+        const fileName = `${file.name.split('.')[0]}-${productId}-${Date.now()}`;
+        const { error: uploadError } = await supabase.storage
+          .from('addon')
+          .upload(fileName, file);
+
+        if (uploadError) {
+          console.error('Error uploading additional image:', uploadError.message);
+          return;
+        }
+
+        uploadedImages.push(fileName);
+      }
+
+      const existingImages = JSON.parse(formValues.additional_images || '[]');
+      updatedValues.additional_images = JSON.stringify([...existingImages, ...uploadedImages]);
     }
 
     // Update the product details in the database
@@ -106,9 +157,12 @@ const EditProduct = () => {
 
   if (loading) return <p>Loading...</p>;
 
+  // Parse additional_images JSON
+  const additionalImages = JSON.parse(formValues.additional_images || '[]');
+
   return (
     <div className="p-6 max-w-4xl mx-auto bg-white rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Edit Product</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">Edit Product Variant</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-gray-700 font-medium">Title</label>
@@ -143,20 +197,92 @@ const EditProduct = () => {
           />
         </div>
         <div>
-          <label className="block text-gray-700 font-medium">Image</label>
+          <label className="block text-gray-700 font-medium">Main Image</label>
           <input
             type="file"
             accept="image/*"
             onChange={handleImageChange}
             className="w-full px-4 py-2 border rounded-lg"
           />
-          {formValues.image && (
-            <img
-              src={`https://bwxzfwsoxwtzhjbzbdzs.supabase.co/storage/v1/object/public/addon/${formValues.image}`}
-              alt="Current product"
-              className="mt-4 w-32 h-32 object-cover rounded"
-            />
-          )}
+          <div className="flex space-x-4 mt-4">
+            {/* Show existing image */}
+            {formValues.image && !imageFile && (
+              <img
+                src={`${baseImageUrl}${formValues.image}`}
+                alt="Current product"
+                className="w-32 h-32 object-cover rounded border border-gray-300 shadow"
+              />
+            )}
+            {/* Show preview of new selected image */}
+            {imageFile && (
+              <div className="relative w-32 h-32">
+                <img
+                  src={URL.createObjectURL(imageFile)}
+                  alt="New preview"
+                  className="w-full h-full object-cover rounded-lg border border-gray-300 shadow"
+                />
+                <button
+                  type="button"
+                  onClick={() => setImageFile(null)}
+                  className="absolute top-2 right-2 bg-red-600 text-white w-6 h-6 flex items-center justify-center rounded-full shadow hover:bg-red-700"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-gray-700 font-medium">Additional Images</label>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleAdditionalImagesChange}
+            className="w-full px-4 py-2 border rounded-lg"
+          />
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            {/* Display existing additional images */}
+            {additionalImages.map((img, index) => (
+              <div key={index} className="relative w-32 h-32">
+                <img
+                  src={`${baseImageUrl}${img}`}
+                  alt={`Additional ${index + 1}`}
+                  className="w-full h-full object-cover rounded-lg border border-gray-300 shadow"
+                />
+                <button
+                  type="button"
+                  onClick={() => deleteAdditionalImage(img)}
+                  className="absolute top-2 right-2 bg-red-600 text-white w-6 h-6 flex items-center justify-center rounded-full shadow hover:bg-red-700"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+
+            {/* Display preview of new selected files */}
+            {additionalImageFiles.map((file, index) => (
+              <div key={`preview-${index}`} className="relative w-32 h-32">
+                <img
+                  src={URL.createObjectURL(file)}
+                  alt={`Preview ${index + 1}`}
+                  className="w-full h-full object-cover rounded-lg border border-gray-300 shadow"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setAdditionalImageFiles((prev) =>
+                      prev.filter((_, fileIndex) => fileIndex !== index)
+                    )
+                  }
+                  className="absolute top-2 right-2 bg-red-600 text-white w-6 h-6 flex items-center justify-center rounded-full shadow hover:bg-red-700"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="flex space-x-4">
           <button

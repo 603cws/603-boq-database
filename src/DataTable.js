@@ -15,7 +15,7 @@ const DataTable = () => {
             setLoading(true);
             const { data, error } = await supabase
                 .from('product_variants')
-                .select(`id, title, price, details, image, product_id,
+                .select(`id, title, price, details, image, additional_images, product_id,
                 products (
                     category, subcategory, subcategory1
                 )
@@ -25,7 +25,7 @@ const DataTable = () => {
             if (error) {
                 console.error('Error fetching products:', error.message);
             } else {
-                    setProducts(data);
+                setProducts(data);
             }
         };
 
@@ -50,7 +50,7 @@ const DataTable = () => {
     };
 
     return (
-        <div className="p-6 max-w-6xl mx-auto bg-white rounded-lg shadow-md">
+        <div className="p-6 max-w-[90%] mx-auto bg-white rounded-lg shadow-md overflow-auto">
             <h1 className="text-2xl font-bold text-gray-800 mb-6">Product Variant Table Management</h1>
             <div className="flex space-x-4 mb-6">
                 <button
@@ -78,6 +78,7 @@ const DataTable = () => {
                                 <th className="border border-gray-200 px-4 py-2 text-left font-bold text-gray-700">Price</th>
                                 <th className="border border-gray-200 px-4 py-2 text-left font-bold text-gray-700">Details</th>
                                 <th className="border border-gray-200 px-4 py-2 text-left font-bold text-gray-700">Image</th>
+                                <th className="border border-gray-200 px-4 py-2 text-left font-bold text-gray-700">Additional Images</th>
                                 <th className="border border-gray-200 px-4 py-2 text-left font-bold text-gray-700">Category</th>
                                 <th className="border border-gray-200 px-4 py-2 text-left font-bold text-gray-700">Sub Category</th>
                                 <th className="border border-gray-200 px-4 py-2 text-left font-bold text-gray-700">Sub-Sub Category</th>
@@ -105,6 +106,33 @@ const DataTable = () => {
                                             ) : (
                                                 'No Image'
                                             )}
+                                        </td>
+                                        <td className="border border-gray-200 px-4 py-2 text-gray-800">
+                                            {(() => {
+                                                try {
+                                                    // Parse additional_images JSON string
+                                                    const images = JSON.parse(product.additional_images);
+                                                    // Check if parsed value is an array
+                                                    if (Array.isArray(images) && images.length > 0) {
+                                                        return (
+                                                            <div className="grid grid-cols-2 gap-2 w-[120px]">
+                                                                {images.slice(0, 4).map((img, index) => (
+                                                                    <img
+                                                                        key={index}
+                                                                        src={`${baseImageUrl}${img}`}
+                                                                        alt={`Additional ${index + 1}`}
+                                                                        className="w-24 h-24 object-cover rounded border border-gray-300 shadow"
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return <span className="text-gray-500">No Additional Images</span>;
+                                                } catch (err) {
+                                                    console.error('Error parsing additional_images:', err);
+                                                    return <span className="text-gray-500">Invalid Images</span>;
+                                                }
+                                            })()}
                                         </td>
                                         <td className="border border-gray-200 px-4 py-2 text-gray-800">{product.products?.category || 'N/A'}</td>
                                         <td className="border border-gray-200 px-4 py-2 text-gray-800">{product.products?.subcategory || 'N/A'}</td>
