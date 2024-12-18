@@ -1,14 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import './form.css';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { supabase } from './supabase';
 import { toast, Toaster } from 'react-hot-toast';
 
 const ProductForm = () => {
-  const [categories, setCategories] = useState([]);
-
+  const navigate = useNavigate(); // Initialize useNavigate
   const variantRef = useRef(null);
   const addonRef = useRef(null);
+
+  const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
+  // const [selectedSubcategory, setSelectedSubcategory] = useState('');
+  const [selectedSubcategories, setSelectedSubcategories] = useState([]);
+  const [subSubCategory, setSubSubCategory] = useState('');
+  const [addonCat, setAddonCat] = useState('');
+  const [variants, setVariants] = useState([{ title: '', price: '', details: '', mainImage: null, additionalImages: [], }]);
 
   const fetchCategories = async () => {
     try {
@@ -57,12 +65,6 @@ const ProductForm = () => {
     name: 'addons'
   });
 
-  const [subcategories, setSubcategories] = useState([]);
-  const [selectedSubcategory, setSelectedSubcategory] = useState('');
-  const [subSubCategory, setSubSubCategory] = useState('');
-  const [addonCat, setAddonCat] = useState('');
-  const [variants, setVariants] = useState([{ title: '', price: '', details: '', mainImage: null, additionalImages: [], }]);
-
   const handleAddVariant = () => {
     setVariants([...variants, { title: '', price: '', details: '', mainImage: null, additionalImages: [], }]);
     // Scroll to the newly added variant
@@ -86,6 +88,17 @@ const ProductForm = () => {
     setVariants(updatedVariants);
   };
 
+  const handleSubcategoryChange = (e) => {
+    const options = e.target.options;
+    const selectedValues = [];
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].selected) {
+        selectedValues.push(options[i].value);
+      }
+    }
+    setSelectedSubcategories(selectedValues.join(","));
+  };
+
   const onSubmit = async (data) => {
     try {
       // Check if the product already exists based on category, subcategory, and subSubCategory
@@ -93,7 +106,7 @@ const ProductForm = () => {
         .from("products")
         .select("id")
         .eq("category", data.category)
-        .eq("subcategory", data.subcategory)
+        .eq("subcategory", selectedSubcategories)
         .eq("subcategory1", subSubCategory) // subSubCategory is from the state
         .single();
 
@@ -103,18 +116,18 @@ const ProductForm = () => {
         return;
       }
 
-    let productId;
-    if (existingProduct) {
-      // If the product already exists, use the existing product ID
-      productId = existingProduct.id;
-      toast.success("Product already exists. Proceeding with variants and addons.");
-    } else {
-      // Insert a new product if it doesn't exist
-      const { data: Product, error: insertError } = await supabase.from("products").insert({
-        category: data.category,
-        subcategory: data.subcategory || null,
-        subcategory1: subSubCategory || null,  // Insert subSubCategory (from state)
-      }).select().single();
+      let productId;
+      if (existingProduct) {
+        // If the product already exists, use the existing product ID
+        productId = existingProduct.id;
+        toast.success("Product already exists. Proceeding with variants and addons.");
+      } else {
+        // Insert a new product if it doesn't exist
+        const { data: Product, error: insertError } = await supabase.from("products").insert({
+          category: data.category,
+          subcategory: selectedSubcategories,
+          subcategory1: subSubCategory || null,  // Insert subSubCategory (from state)
+        }).select().single();
 
         if (insertError) {
           console.error(insertError);
@@ -240,13 +253,16 @@ const ProductForm = () => {
 
   return (
     <form className="" onSubmit={handleSubmit(onSubmit)}>
-      <Toaster
-        position="top-center"
-        reverseOrder={false}
-        toastOptions={{
-          style: { margin: "0 auto", textAlign: "center" },
-        }}
-      />
+      <Toaster position="top-center" reverseOrder={false} />
+
+      {/* Add a Go Back button */}
+      <button
+        type="button"
+        className="mb-4 px-4 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400"
+        onClick={() => navigate('/datatable')}
+      >
+        Go to Product Varaint Table
+      </button>
 
       {/* Category Section */}
       <div>
@@ -272,36 +288,29 @@ const ProductForm = () => {
       {/* Subcategory Section */}
       {subcategories.length > 0 && (
         <div>
-          <label>Subcategory:</label>
+          <label>Subcategories:</label>
           <select
-            {...register('subcategory', { required: 'Subcategory is required' })}
-            onChange={(e) => {
-              setSelectedSubcategory(e.target.value);
-              setSubSubCategory('');
-            }}
+            multiple
+            onChange={handleSubcategoryChange}
           >
-            <option value="">Select Subcategory</option>
             {subcategories.map((subcategory, index) => (
               <option key={index} value={subcategory}>
                 {subcategory}
               </option>
             ))}
           </select>
-          {errors.subcategory && <p>{errors.subcategory.message}</p>}
         </div>
       )}
 
       {/* Sub Subcategory Section */}
-      {selectedSubcategory && (
-        <div>
-          <label>Sub Sub Category:</label>
-          <input
-            type="text"
-            value={subSubCategory}
-            onChange={(e) => setSubSubCategory(e.target.value)}
-          />
-        </div>
-      )}
+      <div>
+        <label>Sub Sub Category:</label>
+        <input
+          type="text"
+          value={subSubCategory}
+          onChange={(e) => setSubSubCategory(e.target.value)}
+        />
+      </div>
 
       {/* Product Variants Section */}
       <div>
