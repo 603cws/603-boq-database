@@ -1,23 +1,45 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from './supabase';
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { supabase } from "./supabase";
 
 const EditProduct = () => {
   const { id: productId } = useParams();
   const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [segments, setSegments] = useState([]);
   const [formValues, setFormValues] = useState({
-    title: '',
-    price: '',
-    details: '',
-    image: '',
-    additional_images: '[]', // JSON string for additional images
+    title: "",
+    price: "",
+    details: "",
+    image: "",
+    additional_images: "[]", // JSON string for additional images
+    segment: "",
+    dimensions: "",
+    manufacturer: "",
   });
   const [imageFile, setImageFile] = useState(null); // Main image file
   const [additionalImageFiles, setAdditionalImageFiles] = useState([]); // New additional images
 
-  const baseImageUrl = 'https://bwxzfwsoxwtzhjbzbdzs.supabase.co/storage/v1/object/public/addon/';
+  const baseImageUrl =
+    "https://bwxzfwsoxwtzhjbzbdzs.supabase.co/storage/v1/object/public/addon/";
+
+  useEffect(() => {
+    const fetchSegments = async () => {
+      const { data, error } = await supabase.rpc("get_enum_values", {
+        enum_name: "segment_type",
+      });
+
+      if (error) {
+        console.error("Error fetching enum values:", error);
+      } else {
+        console.log("Segment types: ", data);
+        setSegments(data); // Extract values from the returned object
+      }
+    };
+
+    fetchSegments();
+  }, []);
 
   // Fetch product details for editing
   useEffect(() => {
@@ -25,14 +47,14 @@ const EditProduct = () => {
       const fetchProduct = async () => {
         setLoading(true);
         const { data, error } = await supabase
-          .from('product_variants')
-          .select('*')
-          .eq('id', productId)
+          .from("product_variants")
+          .select("*")
+          .eq("id", productId)
           .single();
         setLoading(false);
 
         if (error) {
-          console.error('Error fetching product:', error.message);
+          console.error("Error fetching product:", error.message);
         } else {
           setProduct(data);
           setFormValues({
@@ -40,7 +62,10 @@ const EditProduct = () => {
             price: data.price,
             details: data.details,
             image: data.image,
-            additional_images: data.additional_images || '[]', // Ensure we get a JSON string
+            additional_images: data.additional_images || "[]", // Ensure we get a JSON string
+            segment: data.segment,
+            dimensions: data.dimensions,
+            manufacturer: data.manufacturer,
           });
         }
       };
@@ -71,16 +96,18 @@ const EditProduct = () => {
 
   // Delete a specific additional image
   const deleteAdditionalImage = async (imageName) => {
-    const images = JSON.parse(formValues.additional_images || '[]').filter((img) => img !== imageName);
+    const images = JSON.parse(formValues.additional_images || "[]").filter(
+      (img) => img !== imageName
+    );
 
     // Update the database
     const { error } = await supabase
-      .from('product_variants')
+      .from("product_variants")
       .update({ additional_images: JSON.stringify(images) })
-      .eq('id', productId);
+      .eq("id", productId);
 
     if (error) {
-      console.error('Error deleting additional image:', error.message);
+      console.error("Error deleting additional image:", error.message);
     } else {
       setFormValues((prev) => ({
         ...prev,
@@ -97,15 +124,15 @@ const EditProduct = () => {
 
     // Upload main image if updated
     if (imageFile) {
-      const fileName = `${imageFile.name.split('.')[0]}-${productId}`;
+      const fileName = `${imageFile.name.split(".")[0]}-${productId}`;
       const { error: uploadError } = await supabase.storage
-        .from('addon')
+        .from("addon")
         .upload(fileName, imageFile, {
           upsert: true,
         });
 
       if (uploadError) {
-        console.error('Error uploading image:', uploadError.message);
+        console.error("Error uploading image:", uploadError.message);
         return;
       }
 
@@ -116,53 +143,65 @@ const EditProduct = () => {
     if (additionalImageFiles.length > 0) {
       const uploadedImages = [];
       for (const file of additionalImageFiles) {
-        const fileName = `${file.name.split('.')[0]}-${productId}-${Date.now()}`;
+        const fileName = `${
+          file.name.split(".")[0]
+        }-${productId}-${Date.now()}`;
         const { error: uploadError } = await supabase.storage
-          .from('addon')
+          .from("addon")
           .upload(fileName, file);
 
         if (uploadError) {
-          console.error('Error uploading additional image:', uploadError.message);
+          console.error(
+            "Error uploading additional image:",
+            uploadError.message
+          );
           return;
         }
 
         uploadedImages.push(fileName);
       }
 
-      const existingImages = JSON.parse(formValues.additional_images || '[]');
-      updatedValues.additional_images = JSON.stringify([...existingImages, ...uploadedImages]);
+      const existingImages = JSON.parse(formValues.additional_images || "[]");
+      updatedValues.additional_images = JSON.stringify([
+        ...existingImages,
+        ...uploadedImages,
+      ]);
     }
 
     // Update the product details in the database
     const { error } = await supabase
-      .from('product_variants')
+      .from("product_variants")
       .update(updatedValues)
-      .eq('id', productId);
+      .eq("id", productId);
 
     if (error) {
-      console.error('Error updating product:', error.message);
+      console.error("Error updating product:", error.message);
     } else {
-      alert('Product updated successfully!');
-      navigate('/datatable');
+      alert("Product updated successfully!");
+      navigate("/datatable");
     }
   };
 
   // Handle cancel and confirm if user wants to discard changes
   const handleCancel = () => {
-    const discardChanges = window.confirm('Are you sure you want to discard your changes?');
+    const discardChanges = window.confirm(
+      "Are you sure you want to discard your changes?"
+    );
     if (discardChanges) {
-      navigate('/datatable');
+      navigate("/datatable");
     }
   };
 
   if (loading) return <p>Loading...</p>;
 
   // Parse additional_images JSON
-  const additionalImages = JSON.parse(formValues.additional_images || '[]');
+  const additionalImages = JSON.parse(formValues.additional_images || "[]");
 
   return (
     <div className="p-6 max-w-4xl mx-auto bg-white rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Edit Product Variant</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">
+        Edit Product Variant
+      </h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-gray-700 font-medium">Title</label>
@@ -194,6 +233,47 @@ const EditProduct = () => {
             onChange={handleChange}
             className="w-full px-4 py-2 border rounded-lg"
             rows="4"
+          />
+        </div>
+        <div>
+          <label className="block text-gray-700 font-medium">Segment</label>
+          <select
+            name="segment"
+            value={formValues.segment} // Set default value from formValues
+            onChange={handleChange}
+            className="w-full px-4 py-2 border rounded-lg"
+            required
+          >
+            <option value="">Select a segment</option>
+            {segments.map((segmentOption, index) => (
+              <option key={index} value={segmentOption}>
+                {segmentOption}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-gray-700 font-medium">Dimensions</label>
+          <input
+            type="text"
+            name="dimensions"
+            value={formValues.dimensions}
+            onChange={handleChange}
+            className="w-full px-4 py-2 border rounded-lg"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-gray-700 font-medium">
+            Manufacturer
+          </label>
+          <input
+            type="text"
+            name="manufacturer"
+            value={formValues.manufacturer}
+            onChange={handleChange}
+            className="w-full px-4 py-2 border rounded-lg"
+            required
           />
         </div>
         <div>
@@ -234,7 +314,9 @@ const EditProduct = () => {
         </div>
 
         <div>
-          <label className="block text-gray-700 font-medium">Additional Images</label>
+          <label className="block text-gray-700 font-medium">
+            Additional Images
+          </label>
           <input
             type="file"
             accept="image/*"

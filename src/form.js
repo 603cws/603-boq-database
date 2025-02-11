@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
-import './form.css';
-import { useForm, useFieldArray } from 'react-hook-form';
-import { supabase } from './supabase';
-import { toast, Toaster } from 'react-hot-toast';
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom"; // Import useNavigate
+import "./form.css";
+import { useForm, useFieldArray } from "react-hook-form";
+import { supabase } from "./supabase";
+import { toast, Toaster } from "react-hot-toast";
 
 const ProductForm = () => {
   const navigate = useNavigate(); // Initialize useNavigate
@@ -14,72 +14,124 @@ const ProductForm = () => {
   const [subcategories, setSubcategories] = useState([]);
   // const [selectedSubcategory, setSelectedSubcategory] = useState('');
   const [selectedSubcategories, setSelectedSubcategories] = useState([]);
-  const [subSubCategory, setSubSubCategory] = useState('');
-  const [addonCat, setAddonCat] = useState('');
-  const [variants, setVariants] = useState([{ title: '', price: '', details: '', mainImage: null, additionalImages: [], }]);
+  const [subSubCategory, setSubSubCategory] = useState("");
+  const [addonCat, setAddonCat] = useState("");
+  const [variants, setVariants] = useState([
+    {
+      title: "",
+      price: "",
+      details: "",
+      mainImage: null,
+      additionalImages: [],
+      segment: "",
+      dimension: "",
+      manufacturer: "",
+    },
+  ]);
+  const [segments, setSegments] = useState([]);
+  const [selectedSegment, setSelectedSegment] = useState(""); // Stores selected segment
 
   const fetchCategories = async () => {
     try {
       // Fetch data from the 'categories' table
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*'); // Adjust the select fields if necessary
+      const { data, error } = await supabase.from("categories").select("*"); // Adjust the select fields if necessary
 
       if (error) {
         throw new Error(error.message);
       }
 
-      const formattedCategories = data.map(row => {
-
+      const formattedCategories = data.map((row) => {
         return {
           name: row.name,
           // Ensure subcategories is an array, or set it to an empty array if it's null/undefined
-          subcategories: Array.isArray(JSON.parse(row.subcategories)) ? JSON.parse(row.subcategories) : [],
+          subcategories: Array.isArray(JSON.parse(row.subcategories))
+            ? JSON.parse(row.subcategories)
+            : [],
         };
       });
 
       setCategories(formattedCategories); // Store categories in state
     } catch (err) {
-      console.error('Error fetching categories:', err);
+      console.error("Error fetching categories:", err);
     }
   };
+
+  useEffect(() => {
+    const fetchSegments = async () => {
+      const { data, error } = await supabase.rpc("get_enum_values", {
+        enum_name: "segment_type",
+      });
+
+      if (error) {
+        console.error("Error fetching enum values:", error);
+      } else {
+        console.log("Segment types: ", data);
+        setSegments(data); // Extract values from the returned object
+      }
+    };
+
+    fetchSegments();
+  }, []);
 
   useEffect(() => {
     fetchCategories();
   }, []); // Empty dependency array ensures it runs once on mount
 
-  const { register, handleSubmit, control, formState: { errors } } = useForm({
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+  } = useForm({
     defaultValues: {
-      title: '',
-      details: '',
-      price: '',
+      title: "",
+      details: "",
+      price: "",
       image: null,
-      category: '',
-      subcategory: '',
-      addons: [{ image: null, title: '', price: '' }]
-    }
+      category: "",
+      subcategory: "",
+      addons: [{ image: null, title: "", price: "" }],
+    },
   });
 
   const { fields, append, remove } = useFieldArray({
     control,
-    name: 'addons'
+    name: "addons",
   });
 
+  const handleSegmentChange = (event, index) => {
+    const updatedVariants = [...variants];
+    updatedVariants[index].segment = event.target.value;
+    setVariants(updatedVariants);
+  };
+
   const handleAddVariant = () => {
-    setVariants([...variants, { title: '', price: '', details: '', mainImage: null, additionalImages: [], }]);
+    setVariants([
+      ...variants,
+      {
+        title: "",
+        price: "",
+        details: "",
+        mainImage: null,
+        additionalImages: [],
+      },
+    ]);
     // Scroll to the newly added variant
     setTimeout(() => {
-      variantRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      variantRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
     }, 100);
   };
 
   const handleAddAddon = () => {
     // Add a new addon logic
-    append({ image: null, title: '', price: '' });
+    append({ image: null, title: "", price: "" });
 
     // Scroll to the newly added addon
     setTimeout(() => {
-      addonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      addonRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
   };
 
@@ -102,15 +154,16 @@ const ProductForm = () => {
   const onSubmit = async (data) => {
     try {
       // Check if the product already exists based on category, subcategory, and subSubCategory
-      const { data: existingProduct, error: existingProductError } = await supabase
-        .from("products")
-        .select("id")
-        .eq("category", data.category)
-        .eq("subcategory", selectedSubcategories)
-        .eq("subcategory1", subSubCategory) // subSubCategory is from the state
-        .single();
+      const { data: existingProduct, error: existingProductError } =
+        await supabase
+          .from("products")
+          .select("id")
+          .eq("category", data.category)
+          .eq("subcategory", selectedSubcategories)
+          .eq("subcategory1", subSubCategory) // subSubCategory is from the state
+          .single();
 
-      if (existingProductError && existingProductError.code !== 'PGRST116') {
+      if (existingProductError && existingProductError.code !== "PGRST116") {
         console.error(existingProductError);
         toast.error("Error checking existing product.");
         return;
@@ -120,14 +173,20 @@ const ProductForm = () => {
       if (existingProduct) {
         // If the product already exists, use the existing product ID
         productId = existingProduct.id;
-        toast.success("Product already exists. Proceeding with variants and addons.");
+        toast.success(
+          "Product already exists. Proceeding with variants and addons."
+        );
       } else {
         // Insert a new product if it doesn't exist
-        const { data: Product, error: insertError } = await supabase.from("products").insert({
-          category: data.category,
-          subcategory: selectedSubcategories,
-          subcategory1: subSubCategory || null,  // Insert subSubCategory (from state)
-        }).select().single();
+        const { data: Product, error: insertError } = await supabase
+          .from("products")
+          .insert({
+            category: data.category,
+            subcategory: selectedSubcategories,
+            subcategory1: subSubCategory || null, // Insert subSubCategory (from state)
+          })
+          .select()
+          .single();
 
         if (insertError) {
           console.error(insertError);
@@ -143,40 +202,56 @@ const ProductForm = () => {
       for (const variant of variants) {
         if (variant.title && variant.price && variant.mainImage) {
           // Upload the main image to Supabase storage
-          const { data: mainImageUpload, error: mainImageError } = await supabase.storage
-            .from("addon")
-            .upload(`${variant.title}-main-${productId}`, variant.mainImage);
+          const { data: mainImageUpload, error: mainImageError } =
+            await supabase.storage
+              .from("addon")
+              .upload(`${variant.title}-main-${productId}`, variant.mainImage);
 
           if (mainImageError) {
             console.error(mainImageError);
-            toast.error(`Error uploading main image for variant: ${variant.title}`);
+            toast.error(
+              `Error uploading main image for variant: ${variant.title}`
+            );
             break;
           }
 
           // Upload additional images
           const additionalImagePaths = [];
           for (const [index, imageFile] of variant.additionalImages.entries()) {
-            const { data: additionalImageUpload, error: additionalImageError } = await supabase.storage
-              .from("addon")
-              .upload(`${variant.title}-additional-${index}-${productId}`, imageFile);
+            const { data: additionalImageUpload, error: additionalImageError } =
+              await supabase.storage
+                .from("addon")
+                .upload(
+                  `${variant.title}-additional-${index}-${productId}`,
+                  imageFile
+                );
 
             if (additionalImageError) {
               console.error(additionalImageError);
-              toast.error(`Error uploading additional image ${index + 1} for variant: ${variant.title}`);
+              toast.error(
+                `Error uploading additional image ${index + 1} for variant: ${
+                  variant.title
+                }`
+              );
               continue;
             }
             additionalImagePaths.push(additionalImageUpload.path);
           }
 
           // Insert the variant into the product_variants table
-          const { error: variantError } = await supabase.from("product_variants").insert({
-            product_id: productId,
-            title: variant.title,
-            price: variant.price,
-            details: variant.details,
-            image: mainImageUpload.path, // Store the main image path
-            additional_images: additionalImagePaths, // Store paths of additional images
-          });
+          const { error: variantError } = await supabase
+            .from("product_variants")
+            .insert({
+              product_id: productId,
+              title: variant.title,
+              price: variant.price,
+              details: variant.details,
+              image: mainImageUpload.path, // Store the main image path
+              additional_images: additionalImagePaths, // Store paths of additional images
+              segment: variant.segment, // Store segment
+              dimensions: variant.dimension, // Store dimension
+              manufacturer: variant.manufacturer, // Store manufacturer
+            });
 
           if (variantError) {
             console.error(variantError);
@@ -207,22 +282,28 @@ const ProductForm = () => {
         const { image, title, price } = addon;
 
         if (image && title && price) {
-          const { data: addonVariantImage, error: addonVariantImageError } = await supabase.storage
-            .from("addon")
-            .upload(`${title}-${addonId}`, image[0]);
+          const { data: addonVariantImage, error: addonVariantImageError } =
+            await supabase.storage
+              .from("addon")
+              .upload(`${title}-${addonId}`, image[0]);
 
           if (addonVariantImageError) {
-            console.error("Error uploading addon variant image:", addonVariantImageError);
+            console.error(
+              "Error uploading addon variant image:",
+              addonVariantImageError
+            );
             toast.error(`Failed to upload image for addon variant: ${title}`);
             continue;
           }
 
-          const { error: addonVariantError } = await supabase.from("addon_variants").insert({
-            addonid: addonId,
-            title,
-            price,
-            image: addonVariantImage.path,
-          });
+          const { error: addonVariantError } = await supabase
+            .from("addon_variants")
+            .insert({
+              addonid: addonId,
+              title,
+              price,
+              image: addonVariantImage.path,
+            });
 
           if (addonVariantError) {
             console.error("Error inserting addon variant:", addonVariantError);
@@ -237,14 +318,13 @@ const ProductForm = () => {
       // Success message
       toast.success("Data inserted successfully!");
 
-      setTimeout(() => {
-        toast.success("Page will refresh soon...");
-      }, 2000);
+      // setTimeout(() => {
+      //   toast.success("Page will refresh soon...");
+      // }, 2000);
 
-      setTimeout(() => {
-        window.location.reload();
-      }, 5000);
-
+      // setTimeout(() => {
+      //   window.location.reload();
+      // }, 5000);
     } catch (error) {
       console.error("Error in onSubmit:", error);
       toast.error("An unexpected error occurred.");
@@ -259,7 +339,7 @@ const ProductForm = () => {
       <button
         type="button"
         className="mb-4 px-4 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400"
-        onClick={() => navigate('/datatable')}
+        onClick={() => navigate("/datatable")}
       >
         Go to Product Varaint Table
       </button>
@@ -268,10 +348,12 @@ const ProductForm = () => {
       <div>
         <label>Category:</label>
         <select
-          {...register('category', { required: 'Category is required' })}
+          {...register("category", { required: "Category is required" })}
           onChange={(e) => {
             const category = e.target.value;
-            const selectedCatObj = categories.find((cat) => cat.name === category);
+            const selectedCatObj = categories.find(
+              (cat) => cat.name === category
+            );
             setSubcategories(selectedCatObj?.subcategories || []);
           }}
         >
@@ -289,10 +371,7 @@ const ProductForm = () => {
       {subcategories.length > 0 && (
         <div>
           <label>Subcategories:</label>
-          <select
-            multiple
-            onChange={handleSubcategoryChange}
-          >
+          <select multiple onChange={handleSubcategoryChange}>
             {subcategories.map((subcategory, index) => (
               <option key={index} value={subcategory}>
                 {subcategory}
@@ -348,6 +427,48 @@ const ProductForm = () => {
             </div>
 
             <div>
+              <label>Variant Dimension: (H x L x W)</label>
+              <input
+                type="text"
+                value={variant.dimension}
+                onChange={(e) => {
+                  const updatedVariants = [...variants];
+                  updatedVariants[index].dimension = e.target.value;
+                  setVariants(updatedVariants);
+                }}
+              />
+            </div>
+
+            <div>
+              <label>Variant Manufacturer:</label>
+              <input
+                type="text"
+                value={variant.manufacturer}
+                onChange={(e) => {
+                  const updatedVariants = [...variants];
+                  updatedVariants[index].manufacturer = e.target.value;
+                  setVariants(updatedVariants);
+                }}
+              />
+            </div>
+
+            <div>
+              <label>Variant Segment:</label>
+              <select
+                className="border p-2 rounded"
+                value={variant.segment}
+                onChange={(e) => handleSegmentChange(e, index)}
+              >
+                <option value="">Select a segment</option>{" "}
+                {segments.map((segmentOption, i) => (
+                  <option key={i} value={segmentOption}>
+                    {segmentOption}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
               <label>Variant Details:</label>
               <textarea
                 value={variant.details}
@@ -391,7 +512,9 @@ const ProductForm = () => {
                 multiple
                 onChange={(e) => {
                   const updatedVariants = [...variants];
-                  updatedVariants[index].additionalImages = Array.from(e.target.files);
+                  updatedVariants[index].additionalImages = Array.from(
+                    e.target.files
+                  );
                   setVariants(updatedVariants);
                 }}
               />
@@ -455,7 +578,7 @@ const ProductForm = () => {
               type="file"
               accept="image/*" // Accepts all image types like jpg, png, gif, etc.
               {...register(`addons.${index}.image`, {
-                required: 'Image is required',
+                required: "Image is required",
               })}
               onChange={(e) => {
                 const file = e.target.files[0];
@@ -464,7 +587,9 @@ const ProductForm = () => {
                 // setFields(updatedAddons);
               }}
             />
-            {errors.addons?.[index]?.image && <p>{errors.addons[index].image.message}</p>}
+            {errors.addons?.[index]?.image && (
+              <p>{errors.addons[index].image.message}</p>
+            )}
 
             {/* Image Preview */}
             {addon.image && (
@@ -482,7 +607,7 @@ const ProductForm = () => {
             <input
               type="text"
               {...register(`addons.${index}.title`, {
-                required: 'Addon title is required',
+                required: "Addon title is required",
               })}
             />
             {errors.addons?.[index]?.title && (
@@ -493,7 +618,7 @@ const ProductForm = () => {
             <input
               type="number"
               {...register(`addons.${index}.price`, {
-                required: 'Addon price is required',
+                required: "Addon price is required",
               })}
             />
             {errors.addons?.[index]?.price && (
